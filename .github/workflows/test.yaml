@@ -1,0 +1,19 @@
+name: test
+
+on: [ pull_request ]
+
+jobs:
+  test-unit:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+    - name: Fetch sources
+      uses: actions/checkout@v4
+    - name: Run tests
+      run: |
+        export MSBUILDENSURESTDOUTFORTASKPROCESSES=1
+        export MSBUILDDISABLENODEREUSE=1
+        dotnet test test/DotnetTekton.UnitTests
