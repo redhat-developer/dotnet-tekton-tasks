@@ -18,7 +18,7 @@ metadata:
     tekton.dev/displayName: "dotnet publish image"
 spec:
   description: >-
-    dotnet-publish-image task builds a container image from a .NET project
+    The 'dotnet-publish-image' task builds a container image from a .NET project
     and pushes it to a container registry using the .NET SDK's built-in container tooling.
   results:
     - name: IMAGE_DIGEST
