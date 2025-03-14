@@ -2,6 +2,10 @@ name: test
 
 on: [ pull_request ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-unit:
     runs-on: ubuntu-24.04
@@ -17,3 +21,50 @@ jobs:
         export MSBUILDENSURESTDOUTFORTASKPROCESSES=1
         export MSBUILDDISABLENODEREUSE=1
         dotnet test test/DotnetTekton.UnitTests
+
+  test-e2e:
+    strategy:
+      fail-fast: false # Keep running if one leg fails.
+      matrix:
+        pipeline-version:
+        - latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: registry.redhat.io
+          username: ${{ secrets.REGISTRY_REDHAT_USERNAME }}
+          password: ${{ secrets.REGISTRY_REDHAT_TOKEN }}
+      - uses: azure/setup-helm@v4
+      # instantiate a KinD (Kubernetes in Docker) cluster, installs `kubectl` and configures the
+      # `kubeconfig` to reach the local cluster
+      - uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: kind
+          wait: 120s
+          version: v0.24.0
+          config: test/e2e/resources/kind-config.yaml
+      # installs Tekton Pipelines and `tkn` command line, including a local Container-Registry with
+      # settings to reach it during testing
+      - uses: openshift-pipelines/setup-tektoncd@main
+        with:
+          pipeline_version: ${{ matrix.pipeline-version }}
+          feature_flags: '{ "enable-api-fields": "beta" }'
+      # running end-to-end test target
+      - name: test-e2e
+        run: |
+          set -Eeuo pipefail
+          kubectl port-forward --namespace=registry service/registry 32222 &
+          REGISTRY=registry.registry.svc.cluster.local:32222
+          E2E_DOTNET_VERSION=8.0
+          DOTNET_NAMESPACE=dotnet-images
+          skopeo copy --dest-tls-verify=false docker://registry.access.redhat.com/ubi8/dotnet-90:latest docker://$REGISTRY/$DOTNET_NAMESPACE/dotnet:latest
+          skopeo copy --dest-tls-verify=false docker://registry.access.redhat.com/ubi8/dotnet-80-runtime:latest docker://$REGISTRY/$DOTNET_NAMESPACE/dotnet-runtime:$E2E_DOTNET_VERSION
+          kubectl delete secret regcred || true
+          kubectl create secret generic regcred --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
+          kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "regcred"}]}'
+          make test-e2e
