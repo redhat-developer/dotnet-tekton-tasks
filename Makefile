@@ -1,3 +1,11 @@
+BIN = $(CURDIR)/.bin
+
+RELEASE_VERSION ?= v0.0.0
+
+# release directory where the catalog-cd resources are output.
+RELEASE_DIR ?= /tmp/dotnet-tekton-tasks/$(RELEASE_VERSION)
+VERSION_NUMBER := $(shell echo $(RELEASE_VERSION) | sed 's/^v//')
+
 # bats entry point and default flags
 BATS_CORE = ./test/.bats/bats-core/bin/bats
 BATS_FLAGS ?= --print-output-on-failure --show-output-of-passing-tests --verbose-run
@@ -28,6 +36,27 @@ ARGS ?=
 # making sure the variables declared in the Makefile are exported to the excutables/scripts invoked
 # on all targets
 .EXPORT_ALL_VARIABLES:
+
+$(BIN):
+	@mkdir -p $@
+
+CATALOGCD = $(or ${CATALOGCD_BIN},${CATALOGCD_BIN},$(BIN)/catalog-cd)
+$(BIN)/catalog-cd: $(BIN)
+	curl -fsL https://github.com/openshift-pipelines/catalog-cd/releases/download/v0.3.0/catalog-cd_0.3.0_linux_x86_64.tar.gz | tar xzf - -C $(BIN) catalog-cd
+
+.PHONY: prepare-release
+prepare-release:
+	mkdir -p $(RELEASE_DIR) || true
+
+.PHONY: release
+release: ${CATALOGCD} prepare-release
+		$(CATALOGCD) release --output ${RELEASE_DIR} --version $(VERSION_NUMBER) $(TEKTON_TASKS)
+
+.PHONY: github-draft-release
+github-draft-release: release
+	gh release create --draft $(RELEASE_VERSION) --generate-notes && \
+	gh release upload $(RELEASE_VERSION) $(RELEASE_DIR)/catalog.yaml && \
+	gh release upload $(RELEASE_VERSION) $(RELEASE_DIR)/resources.tar.gz
 
 clean:
 
