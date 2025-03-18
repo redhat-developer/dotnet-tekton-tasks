@@ -55,7 +55,8 @@ release: ${CATALOGCD} prepare-release
 
 .PHONY: github-draft-release
 github-draft-release: release
-	gh release create --draft $(RELEASE_VERSION) --generate-notes && \
+	gh release create --draft $(RELEASE_VERSION) --generate-notes \
+		--notes "**TODO**: See [releasing.md](https://github.com/redhat-developer/dotnet-tekton-tasks/blob/main/docs/releasing.md)." && \
 	gh release upload $(RELEASE_VERSION) $(RELEASE_DIR)/catalog.yaml && \
 	gh release upload $(RELEASE_VERSION) $(RELEASE_DIR)/resources.tar.gz
 
