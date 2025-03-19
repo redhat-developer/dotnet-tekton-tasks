@@ -42,7 +42,7 @@ spec:
         When set, overrides the base image used for the application image.
         When the name does not include a registry, the 'SDK_IMAGE' registry is used.
         If the name does not include a tag, the .NET project target version is used (for example: '9.0').
-        The current Kubernetes namespace can be used in the name through '$(context.taskRun.namespace)'.
+        The current Kubernetes namespace can be used in the name via '$(context.taskRun.namespace)'.
       type: string
       default: ""
     - name: PRE_PUBLISH_SCRIPT
@@ -137,12 +137,7 @@ spec:
           [[ -f "$WORKSPACE_DOCKERCONFIG_PATH/.dockerconfigjson" ]] && ln -s "$WORKSPACE_DOCKERCONFIG_PATH/.dockerconfigjson" ~/.config/containers/auth.json
         fi
         
-        if [[ "$WORKSPACE_SOURCE_BOUND" == "true" ]]; then
-          cd "$WORKSPACE_SOURCE_PATH"
-        else
-          mkdir -p ~/src
-          cd ~/src
-        fi
+        cd "$WORKSPACE_SOURCE_PATH"
         
         if [[ -n "$PARAM_PRE_PUBLISH_SCRIPT" ]]; then
           eval "$PARAM_PRE_PUBLISH_SCRIPT"
