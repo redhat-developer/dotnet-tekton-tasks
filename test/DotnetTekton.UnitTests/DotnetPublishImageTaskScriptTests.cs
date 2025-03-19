@@ -281,6 +281,7 @@ public abstract class DotnetPublishImageTaskScriptTests : FileCleanupBase
     [Fact]
     public void ParamPrePublishScriptResetEnvAfterScript()
     {
+        string sourcePath = CreateDirectory();
         var runResult = RunTask(
             envvars: new()
             {
@@ -292,7 +293,9 @@ public abstract class DotnetPublishImageTaskScriptTests : FileCleanupBase
                     echo "script"
                     pwd
                     [[ $- == *e* ]] && echo "errexit enabled" || echo "errexit disabled"
-                    """}
+                    """},
+                { "WORKSPACE_SOURCE_BOUND", "true"},
+                { "WORKSPACE_SOURCE_PATH", sourcePath}
             },
             dotnetStubScript:
                 $"""
@@ -310,7 +313,7 @@ public abstract class DotnetPublishImageTaskScriptTests : FileCleanupBase
         Assert.Equal("/", lines[1]);
         Assert.Equal("errexit disabled", lines[2]);
         Assert.Equal("dotnet", lines[3]);
-        Assert.EndsWith("/src", lines[4]);
+        Assert.Equal(sourcePath, lines[4]);
         Assert.Equal(1, runResult.ExitCode);
     }
 
@@ -603,6 +606,26 @@ public abstract class DotnetPublishImageTaskScriptTests : FileCleanupBase
                     break;
             }
         }
+
+        // Create non-optional workspaces not yet created by the test.
+        YamlSequenceNode taskWorkspaces = (Yaml["spec"]["workspaces"] as YamlSequenceNode)!;
+        foreach (var workspace in taskWorkspaces)
+        {
+            bool isOptional = (workspace as YamlMappingNode).Children.ContainsKey("optional") && (string)workspace["optional"] == "true";
+
+            if (!isOptional)
+            {
+                string workspaceName = (string)workspace["name"]!;
+                string workspaceNameUpper = workspaceName.ToUpperInvariant();
+
+                string workspaceEnvvarPath = $"WORKSPACE_{workspaceNameUpper}_PATH";
+                if (!envvars.ContainsKey(workspaceEnvvarPath)) // Has the test set up the workspace.
+                {
+                    envvars[workspaceEnvvarPath] = CreateDirectory();
+                    envvars[$"WORKSPACE_{workspaceNameUpper}_BOUND"] = "true";
+                }
+            }
+        }        
 
         foreach (var envvar in envvars)
         {
