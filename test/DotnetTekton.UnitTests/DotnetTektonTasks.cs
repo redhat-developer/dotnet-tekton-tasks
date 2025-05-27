@@ -41,14 +41,17 @@ public sealed class DotnetTektonTasks
     {
         foreach (var taskDir in Directory.GetDirectories(Paths.SrcDirectory, $"{TaskDirectoryPrefix}*"))
         {
-            string name = Path.GetFileName(taskDir).Substring(TaskDirectoryPrefix.Length);
-            string taskDefinitionPath = Path.Combine(taskDir, name) + ".yaml";
+            string dirName = Path.GetFileName(taskDir);
+            string taskDefinitionPath = Path.Combine(taskDir, dirName) + ".yaml";
+
+            // Artifacthub expects these to have the same name.
+            Assert.Equal($"{dirName}.yaml", Path.GetFileName(taskDefinitionPath));
 
             using var file = new StreamReader(File.OpenRead(taskDefinitionPath));
             var yamlStream = new YamlStream();
             yamlStream.Load(file);
             YamlNode node = yamlStream.Documents[0].RootNode;
-            _tasks.Add(name!, new TektonTask() { Yaml = node });
+            _tasks.Add(dirName.Substring(TaskDirectoryPrefix.Length), new TektonTask() { Yaml = node });
         }
     }
 }
